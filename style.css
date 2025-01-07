@@ -1,0 +1,5 @@
+.draggable-image {
+    cursor: move;
+    user-select: none; /* Prevent text selection during drag */
+  }
+  
