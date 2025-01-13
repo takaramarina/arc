@@ -124,3 +124,29 @@ window.addEventListener('resize', () => {
   canvas.height = window.innerHeight;
   drawCanvas();
 });
+
+async function loadImages() {
+    try {
+      // Fetch the saved image URLs from the backend
+      const response = await fetch("https://arc-ecru-ten.vercel.app/api/save-image");
+      const data = await response.json();
+  
+      if (data.images && data.images.length > 0) {
+        // Loop through the images and add them to the canvas
+        data.images.forEach((url, index) => {
+          // Add each image to the canvas at a specific position (e.g., staggered)
+          const x = 100 + index * 50; // Staggered x position
+          const y = 100 + index * 50; // Staggered y position
+          addImage(url, x, y);
+        });
+      } else {
+        console.log("No images found to load.");
+      }
+    } catch (error) {
+      console.error("Error loading images:", error);
+    }
+  }
+  
+  // Call the function on page load to load and render saved images
+  window.onload = loadImages;
+  
