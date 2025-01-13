@@ -145,7 +145,7 @@ async function loadImages() {
     } catch (error) {
       console.error("Error loading images:", error);
     }
-  }
+}
   
   // Call the function on page load to load and render saved images
   window.onload = loadImages;
