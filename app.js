@@ -1,22 +1,16 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-// Virtual canvas size
-const virtualCanvas = { width: 5000, height: 5000 };
-
 let scale = 1; // Initial zoom scale
 let offsetX = 0, offsetY = 0; // Initial offset for dragging the page
 let isDraggingCanvas = false;
 let dragStartX = 0, dragStartY = 0;
 
-let images = []; // Array to store image objects
-let selectedImage = null; // Track the currently dragged image
+let images = [];
+let selectedImage = null;
 
-// Set canvas size
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
-
-// Event listeners for page dragging
 canvas.addEventListener('mousedown', (e) => {
   const mousePos = getMousePosition(e);
 
@@ -71,18 +65,17 @@ canvas.addEventListener('wheel', (e) => {
   const mouseY = (e.clientY - canvas.offsetTop) / scale - offsetY;
 
   if (e.deltaY < 0) {
-    scale *= zoomSpeed; // Zoom in
+    scale *= zoomSpeed;
   } else {
-    scale /= zoomSpeed; // Zoom out
+    scale /= zoomSpeed;
   }
 
   offsetX = mouseX - (e.clientX - canvas.offsetLeft) / scale;
   offsetY = mouseY - (e.clientY - canvas.offsetTop) / scale;
-
+  // maybe update to center zoom on the mouse position
   drawCanvas();
 });
 
-// Add images
 function addImage(src, x, y) {
   const img = new Image();
   img.src = src;
@@ -97,7 +90,6 @@ function addImage(src, x, y) {
   };
 }
 
-// Function to draw the entire canvas
 function drawCanvas() {
   // Clear the canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -114,7 +106,6 @@ function drawCanvas() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
-// Utility function to get mouse position on the virtual canvas
 function getMousePosition(e) {
   const rect = canvas.getBoundingClientRect();
   return {
