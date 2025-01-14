@@ -6,7 +6,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@vercel/kv": "^1.0.0"
+    "@vercel/kv": "^1.0.1"
   },
   "keywords": [],
   "author": "",
