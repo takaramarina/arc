@@ -1,9 +1,44 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, push, get, update } from "firebase/database";
 
-const firebaseConfig = { /* Your Firebase Config */ };
+// Import the functions you need from the SDKs you need
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyAxpb0oVMGgH4swqUckNcp2rwmDGsuvObo",
+  authDomain: "archive-2b54e.firebaseapp.com",
+  databaseURL: "https://archive-2b54e-default-rtdb.firebaseio.com",
+  projectId: "archive-2b54e",
+  storageBucket: "archive-2b54e.firebasestorage.app",
+  messagingSenderId: "1015482915954",
+  appId: "1:1015482915954:web:5ab96c91684ed85a1f36eb"
+};
+
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
+const admin = require("firebase-admin");
+
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.cert({
+            type: process.env.FIREBASE_TYPE,
+            project_id: process.env.FIREBASE_PROJECT_ID,
+            private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+            private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+            client_email: process.env.FIREBASE_CLIENT_EMAIL,
+            client_id: process.env.FIREBASE_CLIENT_ID,
+            auth_uri: process.env.FIREBASE_AUTH_URI,
+            token_uri: process.env.FIREBASE_TOKEN_URI,
+            auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_CERT_URL,
+            client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL
+        }),
+        databaseURL: process.env.FIREBASE_DATABASE_URL  // 🔹 Make sure this is included!
+    });
+}
+
 
 export default async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Origin", "*");
