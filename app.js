@@ -105,7 +105,7 @@ canvas.addEventListener('mouseup', async () => {
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
 
-  const zoomSpeed = 1.1;
+  const zoomSpeed = 1.02;
   const mouseX = (e.clientX - canvas.offsetLeft) / scale - offsetX;
   const mouseY = (e.clientY - canvas.offsetTop) / scale - offsetY;
 
