@@ -32,12 +32,34 @@ canvas.addEventListener('mousedown', (e) => {
   }
 });
 
-canvas.addEventListener('mousemove', (e) => {
+async function updateImagePosition(image) {
+  try {
+      await fetch("https://arc-ecru-ten.vercel.app/api/save-image", {
+          method: "POST",
+          headers: {
+              "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+              imageUrl: image.img.src,
+              x: image.x,
+              y: image.y
+          })
+      });
+  } catch (error) {
+      console.error("Error updating image position:", error);
+  }
+}
+
+canvas.addEventListener('mousemove', async (e) => {
   if (selectedImage) {
     const mousePos = getMousePosition(e);
     selectedImage.x = mousePos.x - selectedImage.dragStartX;
     selectedImage.y = mousePos.y - selectedImage.dragStartY;
+    
     drawCanvas();
+
+    // Save the new position to Firebase
+    await updateImagePosition(selectedImage);
   } else if (isDraggingCanvas) {
     const dx = e.clientX - dragStartX;
     const dy = e.clientY - dragStartY;
@@ -76,17 +98,23 @@ canvas.addEventListener('wheel', (e) => {
   drawCanvas();
 });
 
-function addImage(src, x, y) {
+function addImage(src, x = 100, y = 100, skipSave = false) {
   const img = new Image();
   img.src = src;
 
-  img.onload = () => {
-    images.push({ img, x, y, width: img.width, height: img.height });
-    drawCanvas();
+  img.onload = async () => {
+      const newImage = { img, x, y, width: img.width, height: img.height };
+      images.push(newImage);
+      drawCanvas();
+
+      // Save only if this is a new image that doesn't exist in Firebase
+      if (!skipSave) {
+          await saveImageToFirebase(newImage);
+      }
   };
 
   img.onerror = () => {
-    console.error(`Failed to load image: ${src}`);
+      console.error(`Failed to load image: ${src}`);
   };
 }
 
@@ -126,26 +154,22 @@ window.addEventListener('resize', () => {
 });
 
 async function loadImages() {
-    try {
-      // Fetch the saved image URLs from the backend
+  try {
       const response = await fetch("https://arc-ecru-ten.vercel.app/api/save-image");
       const data = await response.json();
-  
+
       if (data.images && data.images.length > 0) {
-        // Loop through the images and add them to the canvas
-        data.images.forEach((url, index) => {
-          // Add each image to the canvas at a specific position (e.g., staggered)
-          const x = 100 + index * 50; // Staggered x position
-          const y = 100 + index * 50; // Staggered y position
-          addImage(url, x, y);
-        });
-      } else {
-        console.log("No images found to load.");
+          data.images.forEach((imgData) => {
+              const x = imgData.x !== undefined ? imgData.x : 100;
+              const y = imgData.y !== undefined ? imgData.y : 100;
+              addImage(imgData.url, x, y, true); // true to skip re-saving
+          });
       }
-    } catch (error) {
+  } catch (error) {
       console.error("Error loading images:", error);
-    }
+  }
 }
+
   
   // Call the function on page load to load and render saved images
   window.onload = loadImages;

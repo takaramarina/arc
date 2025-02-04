@@ -31,32 +31,36 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-        const { imageUrl } = req.body;
-
-        if (!imageUrl) {
-            return res.status(400).json({ error: "Image URL is required" });
+        const { imageUrl, x, y } = req.body;
+    
+        if (!imageUrl || x === undefined || y === undefined) {
+            return res.status(400).json({ error: "Image URL and position are required" });
         }
-
+    
         try {
             const dbRef = ref(database, "images");
-            await push(dbRef, { url: imageUrl });
-            console.log("Image saved:", imageUrl);
+            await push(dbRef, { url: imageUrl, x, y });
+            console.log("Image saved:", { imageUrl, x, y });
             res.status(200).json({ success: true });
         } catch (error) {
             console.error("Error saving image:", error);
             res.status(500).json({ error: "Failed to save image" });
         }
-        return;
     }
-
+    
     if (req.method === "GET") {
         try {
             const dbRef = ref(database, "images");
             const snapshot = await get(dbRef);
-
+    
             if (snapshot.exists()) {
                 const data = snapshot.val();
-                const images = Object.values(data).map((entry) => entry.url);
+                const images = Object.entries(data).map(([id, entry]) => ({
+                    id,
+                    url: entry.url,
+                    x: entry.x,
+                    y: entry.y
+                }));
                 res.status(200).json({ images });
             } else {
                 res.status(200).json({ images: [] });
@@ -65,8 +69,8 @@ export default async function handler(req, res) {
             console.error("Error fetching images:", error);
             res.status(500).json({ error: "Failed to fetch images" });
         }
-        return;
     }
+    
 
     res.status(405).json({ error: "Method not allowed" });
 }
