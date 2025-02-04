@@ -17,7 +17,7 @@ canvas.height = window.innerHeight;
 canvas.addEventListener('mousedown', (e) => {
   const mousePos = getMousePosition(e);
 
-  // Check if the user clicked on a resize handle
+  // Check if the user clicked on an image
   selectedImage = images.find((img) =>
     mousePos.x >= img.x &&
     mousePos.x <= img.x + img.width &&
@@ -40,9 +40,14 @@ canvas.addEventListener('mousedown', (e) => {
       resizingImage.dragStartX = mousePos.x;
       resizingImage.dragStartY = mousePos.y;
     } else {
+      // If clicked inside the image, start dragging the image
+      selectedImage.dragStartX = mousePos.x - selectedImage.x;
+      selectedImage.dragStartY = mousePos.y - selectedImage.y;
       selectedImage = null;
     }
-  } else {
+  }
+
+  if (!selectedImage) {
     isDraggingCanvas = true;
     dragStartX = e.clientX;
     dragStartY = e.clientY;
