@@ -33,13 +33,14 @@ canvas.addEventListener('mousedown', (e) => {
 });
 
 async function updateImagePosition(image) {
+  if (!image.id) return; // If there's no ID, don't try to update
+
   try {
       await fetch("https://arc-ecru-ten.vercel.app/api/save-image", {
           method: "POST",
-          headers: {
-              "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+              id: image.id,  // Send the image ID so we update the correct entry
               imageUrl: image.img.src,
               x: image.x,
               y: image.y
@@ -50,7 +51,9 @@ async function updateImagePosition(image) {
   }
 }
 
-canvas.addEventListener('mousemove', async (e) => {
+let updateTimeout = null; // To prevent excessive Firebase updates
+
+canvas.addEventListener('mousemove', (e) => {
   if (selectedImage) {
     const mousePos = getMousePosition(e);
     selectedImage.x = mousePos.x - selectedImage.dragStartX;
@@ -58,8 +61,11 @@ canvas.addEventListener('mousemove', async (e) => {
     
     drawCanvas();
 
-    // Save the new position to Firebase
-    await updateImagePosition(selectedImage);
+    // Throttle updates to Firebase
+    if (updateTimeout) clearTimeout(updateTimeout);
+    updateTimeout = setTimeout(() => {
+        updateImagePosition(selectedImage);
+    }, 500); // Only update after 500ms of inactivity
   } else if (isDraggingCanvas) {
     const dx = e.clientX - dragStartX;
     const dy = e.clientY - dragStartY;
@@ -74,7 +80,24 @@ canvas.addEventListener('mousemove', async (e) => {
   }
 });
 
-canvas.addEventListener('mouseup', () => {
+canvas.addEventListener('mouseup', async () => {
+  if (selectedImage) {
+    try {
+      await fetch("https://arc-ecru-ten.vercel.app/api/save-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: selectedImage.img.src,
+          x: selectedImage.x,
+          y: selectedImage.y
+        }),
+      });
+      console.log("Image position updated:", selectedImage.img.src, selectedImage.x, selectedImage.y);
+    } catch (error) {
+      console.error("Error updating image position:", error);
+    }
+  }
+  
   isDraggingCanvas = false;
   selectedImage = null;
 });
@@ -98,12 +121,19 @@ canvas.addEventListener('wheel', (e) => {
   drawCanvas();
 });
 
-function addImage(src, x = 100, y = 100, skipSave = false) {
+function addImage(src, x = 100, y = 100, skipSave = false, id = null) {
   const img = new Image();
   img.src = src;
 
   img.onload = async () => {
-      const newImage = { img, x, y, width: img.width, height: img.height };
+      const newImage = { 
+          id, // Store the Firebase ID if available
+          img, 
+          x, 
+          y, 
+          width: img.width, 
+          height: img.height 
+      };
       images.push(newImage);
       drawCanvas();
 
@@ -143,8 +173,8 @@ function getMousePosition(e) {
 }
 
 // Example of adding images
-addImage('IMG_2654.jpg', 300, 300);
-addImage('IMG_2654.jpg', 1000, 1000);
+// addImage('IMG_2654.jpg', 300, 300);
+// addImage('IMG_2654.jpg', 1000, 1000);
 
 // Adjust canvas size on window resize
 window.addEventListener('resize', () => {
@@ -162,7 +192,7 @@ async function loadImages() {
           data.images.forEach((imgData) => {
               const x = imgData.x !== undefined ? imgData.x : 100;
               const y = imgData.y !== undefined ? imgData.y : 100;
-              addImage(imgData.url, x, y, true); // true to skip re-saving
+              addImage(imgData.url, x, y, true, imgData.id); // Pass the ID from Firebase
           });
       }
   } catch (error) {
