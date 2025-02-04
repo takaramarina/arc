@@ -8,12 +8,9 @@ let dragStartX = 0, dragStartY = 0;
 
 let images = [];
 let selectedImage = null;
-let resizingImage = null;  // For resizing
-let resizeHandleSize = 10; // Size of the resize handle
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
-
 canvas.addEventListener('mousedown', (e) => {
   const mousePos = getMousePosition(e);
 
@@ -26,61 +23,49 @@ canvas.addEventListener('mousedown', (e) => {
   );
 
   if (selectedImage) {
-    // Check if the user clicked on the resize handle (bottom-right corner)
-    const resizeHandleX = selectedImage.x + selectedImage.width - resizeHandleSize;
-    const resizeHandleY = selectedImage.y + selectedImage.height - resizeHandleSize;
-
-    if (
-      mousePos.x >= resizeHandleX &&
-      mousePos.x <= resizeHandleX + resizeHandleSize &&
-      mousePos.y >= resizeHandleY &&
-      mousePos.y <= resizeHandleY + resizeHandleSize
-    ) {
-      resizingImage = selectedImage;
-      resizingImage.dragStartX = mousePos.x;
-      resizingImage.dragStartY = mousePos.y;
-    } else {
-      // If clicked inside the image, start dragging the image
-      selectedImage.dragStartX = mousePos.x - selectedImage.x;
-      selectedImage.dragStartY = mousePos.y - selectedImage.y;
-      selectedImage = null;
-    }
-  }
-
-  if (!selectedImage) {
+    selectedImage.dragStartX = mousePos.x - selectedImage.x;
+    selectedImage.dragStartY = mousePos.y - selectedImage.y;
+  } else {
     isDraggingCanvas = true;
     dragStartX = e.clientX;
     dragStartY = e.clientY;
   }
 });
 
-canvas.addEventListener('mousemove', async (e) => {
-  const mousePos = getMousePosition(e);
+async function updateImagePosition(image) {
+  if (!image.id) return; // If there's no ID, don't try to update
 
-  if (resizingImage) {
-    // Calculate the new width and height based on mouse movement
-    const dx = mousePos.x - resizingImage.dragStartX;
-    const dy = mousePos.y - resizingImage.dragStartY;
+  try {
+      await fetch("https://arc-ecru-ten.vercel.app/api/save-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+              id: image.id,  // Send the image ID so we update the correct entry
+              imageUrl: image.img.src,
+              x: image.x,
+              y: image.y
+          })
+      });
+  } catch (error) {
+      console.error("Error updating image position:", error);
+  }
+}
 
-    resizingImage.width = Math.max(50, resizingImage.width + dx); // Prevent shrinking too small
-    resizingImage.height = Math.max(50, resizingImage.height + dy); // Prevent shrinking too small
+let updateTimeout = null; // To prevent excessive Firebase updates
 
-    resizingImage.dragStartX = mousePos.x;
-    resizingImage.dragStartY = mousePos.y;
-
-    drawCanvas();
-
-    // Save the new image size to Firebase
-    await updateImageSize(resizingImage);
-  } else if (selectedImage) {
-    // Handle moving the image
+canvas.addEventListener('mousemove', (e) => {
+  if (selectedImage) {
+    const mousePos = getMousePosition(e);
     selectedImage.x = mousePos.x - selectedImage.dragStartX;
     selectedImage.y = mousePos.y - selectedImage.dragStartY;
-
+    
     drawCanvas();
 
-    // Save the new position to Firebase
-    await updateImagePosition(selectedImage);
+    // Throttle updates to Firebase
+    if (updateTimeout) clearTimeout(updateTimeout);
+    updateTimeout = setTimeout(() => {
+        updateImagePosition(selectedImage);
+    }, 500); // Only update after 500ms of inactivity
   } else if (isDraggingCanvas) {
     const dx = e.clientX - dragStartX;
     const dy = e.clientY - dragStartY;
@@ -96,7 +81,23 @@ canvas.addEventListener('mousemove', async (e) => {
 });
 
 canvas.addEventListener('mouseup', async () => {
-  resizingImage = null;
+  if (selectedImage) {
+    try {
+      await fetch("https://arc-ecru-ten.vercel.app/api/save-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: selectedImage.img.src,
+          x: selectedImage.x,
+          y: selectedImage.y
+        }),
+      });
+      console.log("Image position updated:", selectedImage.img.src, selectedImage.x, selectedImage.y);
+    } catch (error) {
+      console.error("Error updating image position:", error);
+    }
+  }
+  
   isDraggingCanvas = false;
   selectedImage = null;
 });
@@ -116,78 +117,50 @@ canvas.addEventListener('wheel', (e) => {
 
   offsetX = mouseX - (e.clientX - canvas.offsetLeft) / scale;
   offsetY = mouseY - (e.clientY - canvas.offsetTop) / scale;
+  // maybe update to center zoom on the mouse position
   drawCanvas();
 });
 
-function addImage(src, x = 100, y = 100, skipSave = false) {
+function addImage(src, x = 100, y = 100, skipSave = false, id = null) {
   const img = new Image();
   img.src = src;
 
   img.onload = async () => {
-    const newImage = { img, x, y, width: img.width, height: img.height };
-    images.push(newImage);
-    drawCanvas();
+      const newImage = { 
+          id, // Store the Firebase ID if available
+          img, 
+          x, 
+          y, 
+          width: img.width, 
+          height: img.height 
+      };
+      images.push(newImage);
+      drawCanvas();
 
-    if (!skipSave) {
-      await saveImageToFirebase(newImage);
-    }
+      // Save only if this is a new image that doesn't exist in Firebase
+      if (!skipSave) {
+          await saveImageToFirebase(newImage);
+      }
   };
 
   img.onerror = () => {
-    console.error(`Failed to load image: ${src}`);
+      console.error(`Failed to load image: ${src}`);
   };
 }
 
-async function updateImageSize(image) {
-  try {
-    await fetch("https://arc-ecru-ten.vercel.app/api/save-image", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        imageUrl: image.img.src,
-        x: image.x,
-        y: image.y,
-        width: image.width,
-        height: image.height
-      })
-    });
-  } catch (error) {
-    console.error("Error updating image size:", error);
-  }
-}
-
-async function updateImagePosition(image) {
-  try {
-    await fetch("https://arc-ecru-ten.vercel.app/api/save-image", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        imageUrl: image.img.src,
-        x: image.x,
-        y: image.y
-      })
-    });
-  } catch (error) {
-    console.error("Error updating image position:", error);
-  }
-}
-
 function drawCanvas() {
+  // Clear the canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  // Apply transformations for page dragging and zooming
   ctx.setTransform(scale, 0, 0, scale, -offsetX * scale, -offsetY * scale);
 
+  // Draw images
   images.forEach((image) => {
     ctx.drawImage(image.img, image.x, image.y, image.width, image.height);
-    // Draw resize handle at the bottom-right corner
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.fillRect(image.x + image.width - resizeHandleSize, image.y + image.height - resizeHandleSize, resizeHandleSize, resizeHandleSize);
   });
 
+  // Reset transformations
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
@@ -199,6 +172,11 @@ function getMousePosition(e) {
   };
 }
 
+// Example of adding images
+// addImage('IMG_2654.jpg', 300, 300);
+// addImage('IMG_2654.jpg', 1000, 1000);
+
+// Adjust canvas size on window resize
 window.addEventListener('resize', () => {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -207,19 +185,22 @@ window.addEventListener('resize', () => {
 
 async function loadImages() {
   try {
-    const response = await fetch("https://arc-ecru-ten.vercel.app/api/save-image");
-    const data = await response.json();
+      const response = await fetch("https://arc-ecru-ten.vercel.app/api/save-image");
+      const data = await response.json();
 
-    if (data.images && data.images.length > 0) {
-      data.images.forEach((imgData) => {
-        const x = imgData.x !== undefined ? imgData.x : 100;
-        const y = imgData.y !== undefined ? imgData.y : 100;
-        addImage(imgData.url, x, y, true); // true to skip re-saving
-      });
-    }
+      if (data.images && data.images.length > 0) {
+          data.images.forEach((imgData) => {
+              const x = imgData.x !== undefined ? imgData.x : 100;
+              const y = imgData.y !== undefined ? imgData.y : 100;
+              addImage(imgData.url, x, y, true, imgData.id); // Pass the ID from Firebase
+          });
+      }
   } catch (error) {
-    console.error("Error loading images:", error);
+      console.error("Error loading images:", error);
   }
 }
 
-window.onload = loadImages;
+  
+  // Call the function on page load to load and render saved images
+  window.onload = loadImages;
+  
