@@ -19,7 +19,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
-const admin = require("firebase-admin");
+// const admin = require("firebase-admin");
 
 if (!admin.apps.length) {
     admin.initializeApp({
